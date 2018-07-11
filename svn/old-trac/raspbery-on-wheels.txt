@@ -1,0 +1,155 @@
+=== Video ===
+
+[http://www.facebook.com/v/3480577728641 video]
+
+=== things ===
+
+- raspbian on a raspberry pi B, 2G flashdrive
+- ralink usb wifi
+- 2x 4A battery + holders
+- lm7805
+- robotkit [http://www.iprototype.nl/products/robotics/platforms/2wd-magician-platform  order]
+- TB6612FNG dc-controler break out   [http://www.iprototype.nl/products/robotics/drivers-controllers/1A-dual-motor-driver order]
+- old floppy-disk 
+- old utp cable/jump wires
+- 16 header pins
+
+=== docs ===
+
+* http://elinux.org/RPi_Low-level_peripherals
+* http://bildr.org/2012/04/tb6612fng-arduino/
+
+=== tools ===
+
+- soldering tools    
+- hdmi compatible screen
+
+=== schema ===
+
+{{{
+
+later fritzing images here....
+}}}
+
+=== Code ===
+
+config.txt::
+{{{
+## pins
+
+DIR="/sys/class/gpio"
+
+# standby 
+STB=18
+
+# moter A
+AIN=24
+ADIR1=21
+ADIR2=22
+
+# motor B
+BIN=23
+BDIR1=17
+BDIR2=4
+
+#all pins
+ALL_OUT="18 24 21 22 23 17 4"
+
+}}}
+
+setup_pins.sh
+
+
+{{{
+. ./config.txt
+for i in $ALL_OUT
+do
+
+	echo $i
+	echo $i > ${DIR}/export	
+	echo out > ${DIR}/gpio${i}/direction
+
+ 
+done
+}}}
+
+ run.sh
+
+{{{
+
+## get config 
+
+. ./config.txt
+
+# set standby
+echo "0" > ${DIR}/gpio${STB}/value 
+
+#DIRECTION=f
+
+# set dir
+direction(){
+	case $DIRECTION in 
+	b)
+		echo "1" > ${DIR}/gpio${ADIR1}/value 
+		echo "0" > ${DIR}/gpio${ADIR2}/value 
+		echo "1" > ${DIR}/gpio${BDIR1}/value 
+		echo "0" > ${DIR}/gpio${BDIR2}/value
+		RUN=1
+		;;
+	f)
+		echo "0" > ${DIR}/gpio${ADIR1}/value 
+		echo "1" > ${DIR}/gpio${ADIR2}/value 
+		echo "0" > ${DIR}/gpio${BDIR1}/value 
+		echo "1" > ${DIR}/gpio${BDIR2}/value
+		RUN=2
+		;;
+	l)
+		echo "1" > ${DIR}/gpio${ADIR1}/value 
+		echo "0" > ${DIR}/gpio${ADIR2}/value 
+		echo "0" > ${DIR}/gpio${BDIR1}/value 
+		echo "1" > ${DIR}/gpio${BDIR2}/value
+		RUN=0.1
+		;;
+	r)
+		echo "0" > ${DIR}/gpio${ADIR1}/value 
+		echo "1" > ${DIR}/gpio${ADIR2}/value 
+		echo "1" > ${DIR}/gpio${BDIR1}/value 
+		echo "0" > ${DIR}/gpio${BDIR2}/value
+		RUN=0.1
+		;;
+		*)
+			echo use f b r l
+			;; 
+	esac
+	}	
+
+
+echo "1" > ${DIR}/gpio${AIN}/value 
+echo "1" > ${DIR}/gpio${BIN}/value 
+
+#for i in f b l r
+
+while [ 1 ]
+do
+	read DIRECTION
+	direction
+	echo $i 	
+	echo "1" > ${DIR}/gpio${STB}/value
+
+	sleep $RUN 
+
+	echo "0" > ${DIR}/gpio${STB}/value
+
+done
+
+
+
+}}}
+
+
+
+
+
+
+
+

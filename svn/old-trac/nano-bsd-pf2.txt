@@ -1,0 +1,335 @@
+== Start ==
+
+The [http://martenvijn.nl/svn/LICENSE licence] make the difference.
+
+=== Requirements ===
+
+ - i386 machine to install FreeBSD and build NanoBSD (more CPU/Mem is better)   
+ - nullmodem adapter
+ - (usb to) serial adapter
+ - usb compact flash card reader 
+ - accesspoint hardware (here a soekris 4501 with atheros wificard)
+ - access to internet
+ - 1Gb (or larger) complact flash card 
+ - you have to be able to work with [http://en.wikipedia.org/wiki/Vi vi] to edit files, just a small subset of commands is needed:
+  - i => editor mode
+  - Esc => view mode
+  - :wq => write quit (shift-ZZ)
+  - :q  => quit
+  - !:q => force quit 
+
+
+
+=== Install FreeBSD  ===
+
+Install FreeBSD according to the [http://www.freebsd.org/doc/en/books/handbook/ Handbook]
+
+=== build NanoBSD ===
+
+[http://www.freebsd.org/doc/en/articles/nanobsd/index.html Introduction]
+
+{{{
+cd /usr/src/tools/tools/nanobsd
+fetch http://martenvijn.nl/trac/attachment/wiki/ap/nano.tgz
+tar xvzf nano.tgz
+}}}
+
+
+This config sets:
+ - serial port
+ - copies dhcpd
+ - adds files
+ - adds KERNEL support for vlan, pf/altq, bridging,802.11s 
+
+{{{
+sh nanobsd.sh -c my_nano.cfg
+}}}
+
+
+If all is fine your new is an new image is /usr/obj/nanobsd.full/_.disk.full
+Pull your cf-card in the socket and then connect the usb-cf adapter
+check dmesg for your drive
+
+{{{
+dmesg
+}}}
+
+In my case it shows up as /dev/da0.
+Write the image...
+{{{
+cat /usr/obj/nanobsd.full/_.disk.full > /dev/da0 
+}}}
+
+== Setup the AP ==
+
+Plug in the usb2serial adapter and connect the null-modem cable. Connect the box from the buildhost. 
+{{{
+cu -l cuaU0 -s 9600
+}}}
+
+or for the comport
+{{{
+cu -l cuau0
+}}}
+
+Login as root.
+
+{{{
+sh change_passwd
+ifconfig -l 
+ifconfig sis0 192.168.1.1/24
+/etc/rc.d/ssh onestart
+sh save_sshkeys.sh
+}}}
+
+to access the box give your self an ipnumber in the same range
+{{{
+ifconfig 192.168.1.2/24
+or
+ifconfig 192.168.1.1 255.255.255.0
+}}}
+or an equivalent for your operating system....
+
+then connect as cross-cable 
+{{{
+ssh root@192.168.1.1
+}}}
+
+=== Note on /etc and /cfg ===
+
+At boottime to content of /cfg/ copied to /etc/. So after a reboot changes in /etc/ are gone if the are not saved in /cfg.
+To save files in /cfg you have to mount it first.
+
+{{{
+mount /cfg/
+cp /etc/<what_ever> /cfg/
+umount /cfg
+}}}
+
+Unmounting is necessary to save /cfg from data corruption. The test to test new configs it to reboot. 
+
+For this document I point mostly to /cfg to edit files. To test these at runtime the file should be copied to /etc/ 
+
+
+=== General setup ===
+
+Most is done in /etc/rc.conf
+ 
+Mount /cfg
+{{{
+mount /cfg
+cp /etc/rc.conf /cfg/
+vi /cfg/rc.conf
+}}}
+
+add:
+{{{
+defaultrouter="<ip_gateway>"
+gateway_enable="YES"
+ifconfig_sis0="inet <ip> netmask <subnet>"
+ifconfig_sis1="inet 192.168.1.1 netmask 255.255.255.0"
+sshd_enable="YES"
+
+}}}
+
+Note: sometimes you wish to clone or set a mac-address. It is done like this in /etc/start_if.sis0 :
+{{{
+ifconfig sis0 ether 00:aa:bb:cc:dd:ee
+}}}
+
+
+
+
+=== natting firewall ===
+
+create /etc/pf.conf
+{{{
+vi /etc/pf.conf
+}}}
+
+Add a simple natting firewall in /etc/pf.conf  (read more on [http://www.freebsd.org/doc/en/books/handbook/firewalls-pf.html pf])
+{{{
+ext_if="sis0"
+
+scrub in all
+
+nat on $ext_if from !sis0 -> ($ext_if)
+
+pass in all
+pass out all
+pass inet proto icmp all icmp-type echoreq keep state	
+block proto tcp to port 25
+
+block in on $ext_if
+}}}
+
+test your firewall
+{{{
+pfctl -e (enable)
+pfctl -f /etc/pf.conf (load rules)
+}}}
+
+If it works copy the file to /cfg 
+{{{
+mount /cfg
+cp /etc/pf.cfg /cfg/
+}}}
+To enable pf at boottime add this to /cfg/rc.conf
+{{{
+pf_enable="YES"
+}}}
+
+=== caching dns  ===
+
+add /cfg/rc.conf
+{{{
+named_enable="YES"
+}}}
+
+Add some forwarders to /etc/namedb/named.conf. Prefferable your dns-server are used here. For I will use some [http://theos.in/windows-xp/free-fast-public-dns-server-list/ public servers].
+
+in /etc/namedb/name.conf find 
+{{{
+/*
+        forwarders {
+                127.0.0.1;
+        };
+*/
+}}}
+
+and change it to:
+{{{
+forwarders {
+    67.138.54.100;
+    207.225.209.66;
+    208.67.222.222;
+    156.154.70.1;
+    156.154.71.1;
+    208.67.220.220;
+    4.2.2.1;
+    4.2.2.2;
+    4.2.2.3;
+    4.2.2.4;
+    4.2.2.5;
+    4.2.2.6;
+};
+}}}
+Make sure your remove the
+{{{
+/*
+*/
+}}}
+
+then sure named does listen to the corrent ipnumber
+{{{
+listen-on       { 127.0.0.1; 
+                 192.168.1.1;                    
+                 };
+}}}
+
+}}}
+
+start named
+{{{
+/etc/rc.d/named start
+}}}
+
+test 
+{{{
+dig martenvijn.nl @192.168.1.1
+}}}
+
+store the config in /cfg
+{{{
+mount /cfg
+mkdir -p /cfg/namedb
+cp /etc/namedb/named.conf /cfg/namedb/
+}}}
+
+=== Dhcpd ===
+
+add to /cfg/rc.conf
+{{{
+dhcpd_enable="YES"
+dhcpd_flags="-cf /etc/dhcpd"
+}}}
+
+vi /cfg/dhcpd.conf
+{{{
+default-lease-time 600;
+max-lease-time 7200;
+authoritative;
+ddns-update-style none;
+log-facility local7;
+option domain-name-servers 192.168.1.1;
+option routers  192.168.1.1;
+subnet 192.168.1.0 netmask 255.255.255.0 {
+    range 192.168.1.10 192.168.1.250;
+}
+}}}
+
+
+=== Setting up Wifi ===
+
+in /etc/rc.conf
+{{{
+ifconfig_wlan0="inet 192.168.10.2/24"
+wlans_ath0="wlan0"
+create_args_wlan0="wlanmode hostap mode 11g"
+hostapd_enable=YES
+}}}
+
+in /etc/hostapd.conf
+{{{
+interface=wlan0
+hw_mode=g
+macaddr_acl=0
+auth_algs=1
+ssid=ap1
+ctrl_interface=/var/run/hostapd
+ctrl_interface_group=wheel
+wpa=2
+wpa_passphrase=<change_this>
+wpa_key_mgmt=WPA-PSK
+wpa_pairwise=CCMP
+}}}
+
+== bridging Wifi to Lan ==
+
+add this to rc.conf
+{{{
+cloned_interfaces="bridge0"
+ifconfig_bridge0="192.168.1.3/24 addm sis0 addm wlan0 up"
+}}}
+
+
+=== Last offers ===
+
+Sometimes thing does startup properly. Often because files are missing.
+Here some trouble fixing comes in. In my case dhcpd is missing a leases file and it start up script.
+
+A common place to fix it is in rc.local. Rc.local is a shell script that is run once after init. 
+
+Here my fixes:
+
+{{{
+touch /var/db/dhcpd.leases
+/usr/local/sbin/dhcpd -cf /etc/dhcpd.conf bridge0 
+}}}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

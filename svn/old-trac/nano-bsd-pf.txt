@@ -1,0 +1,176 @@
+= This is a project of some "leftovers" from other projects. =
+
+== History ==
+
+One of the windows pc's got "bot-netted", my external ip number got dns black listed. 
+To prevent happening this again I want bridging firewall in LAN that can controls traffic.
+
+== Goal ==
+
+ * bridging firewall
+ * Controling access to then lan and the internet per operating system
+ * minimum of work
+ * central point of administration
+
+For Example:
+ * FreeBSD = full access
+ * Linux = ports 25,53,80,443,993
+ * Windows = ports 53,80,443
+ * Mac = no access
+== Env ==
+
+ * adsl router on 10.0.0.1
+  * gateway 
+  * nat
+  * dns
+  * dhcpd
+ * my ip is 10.0.0.10
+ * home server 10.0.0.11
+
+{{{
+   adsl-modem =----= bridge =-----= pc's (Linux, FreeBSD, Windows (no MAc's))
+            \ 
+             \=----= home server (http,mail,backup)
+
+}}}
+== Hardware ==
+ * 128Mb CF card
+ * soekris net4501
+ * pci quad card (4xlan)
+
+more needed:
+ * buildhost FreeBSD
+ * (usb2)serial adapter
+ * (usb) compact-flash card reader 
+ 
+== TinyBSD ==
+
+Here it used TinyBSD because the limited space. Use NanoBSD if you larger cards.
+
+=== KERNEL ===
+
+I want a multi usage image so I added support for:
+ * ALTQ
+ * vlan
+ * bridging
+ * wlan 
+ * 802.11s
+ * lagg
+ * carp
+
+Obviously not everything is used here.
+
+Here is my [http://martenvijn.nl/trac/attachment/wiki/winguard/TINYBSD KERNEL] file
+
+=== building  the image ===
+
+{{{
+cd /usr/src/tools/tools/tinybsd/conf/wrap
+mv TINYBSD TINYBSD.orig
+fetch http://martenvijn.nl/trac/attachment/wiki/winguard/TINYBSD
+cd ../..
+sh tinybsd
+# follow defaults
+}}}
+
+=== write the image ===
+{{{
+dd if=tinybsd.bin of=/dev/da<n> bs=16k
+}}}
+
+== rc.conf ==
+
+{{{
+hostname="winguard"
+sendmail_enable="NONE"
+sshd_enable="YES"
+usbd_enable="NO"
+inetd_enable="NO"
+portmap_enable="NO"
+update_motd="NO"
+varmfs="YES"
+populate_var="YES"
+varsize="8192"
+tmpmfs="YES"
+ifconfig_sis0="up"
+ifconfig_sis1="up"
+ifconfig_sis2="up"
+ifconfig_sis3="up"
+ifconfig_sis4="10.1.1.10/24" 
+ifconfig_sis5="up"
+ifconfig_sis6="up"
+
+pf_enable="YES"
+
+cloned_interfaces=bridge0
+ifconfig_bridge0="addm sis0 addm 1 addm sis2 addm sis3 addm sis4 addm sis5 addm sis6 up"
+
+}}}
+
+To give PF access to the bridge enter in /etc/sysctl.conf
+{{{
+net.link.bridge.pfil_onlyip=1
+net.link.bridge.pfil_member=1
+net.link.bridge.pfil_bridge=0
+}}}
+
+
+== sshd ==
+
+Then copy you ssh-key to /root/.ssh/authorized_keys and change in /etc/ssh/sshd_config
+
+{{{
+PermitRootLogin without-password # yes
+}}}
+
+== pf.conf ==
+
+{{{
+ext_if="sis4"
+
+open_win="{80,443}"
+open_lin="{25,80,443,993}"
+
+scrub in all
+
+# block log  on $ext_if all
+block on $ext_if all
+block in quick on $ext_if from urpf-failed
+pass quick on lo0 
+block quick inet6 all
+
+## dhcp
+pass quick on $ext_if proto udp from any port 68 to any port 67 
+pass quick on $ext_if proto udp from any port 67 to any port 68
+
+# ping
+pass inet proto icmp all icmp-type echoreq keep state   
+# ssh
+pass in on $ext_if proto tcp from any to 10.0.0.10 port ssh        
+
+## DNS
+pass on $ext_if proto udp from any to 10.0.0.1 port 53 keep state
+
+## Windos rules
+pass quick on $ext_if proto tcp from any os "Windows" \
+                to any port $open_win  keep state 
+
+##  Linux rules hard
+pass quick on $ext_if proto tcp from any os "Linux" \
+               to any port $open_lin  keep state 
+#pass from any os "Linux"
+
+pass from any os "Linux"
+##  FreeBSD rules harder
+#pass quick on $ext_if proto tcp from any os "FreeBSD" \
+#                to any port $open_ports  keep state 
+
+pass from any os "FreeBSD"
+
+# nothing for MAC 
+
+## debugging keep disabled
+#pass all
+}}}
+
+

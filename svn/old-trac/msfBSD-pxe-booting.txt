@@ -1,0 +1,179 @@
+== Goal ==
+
+I want to prepare the [http://bsd.wifisoft.org/nek NEK] for larger deployments:
+
+Here I use [http://bsd.wifisoft.org/svn/projects/nek/events/T-Dose-2009/t-dose_setup.sh a script] to configure a cloud of accesspoints. 
+
+My needs: 
+ - pxeboot (versus preparing/maintening cf-cards)
+ - boot into memory (versus nfsboot)
+ - kernel support for lagg,vlan,carp,pf,ALTQ (versus GENERIC)
+
+
+Here FreeBSD 8.0-RC1 is used, and my ipnummer is 10.0.0.1/24
+
+License: http://martenvijn.nl/svn/LICENSE
+
+
+== Setup mfsBSD  ==
+
+I need  some reconfiguration:
+ - host keys at build time
+ - public ssh-key for root
+ - serial console acces
+
+so fetch mfsBSD:
+{{{
+cd /usr
+fetch http://people.freebsd.org/~mm/mfsbsd/mfsbsd-1.0-beta2.tar.gz
+tar xvzf mfsbsd-1.0-beta2.tar.gz
+cd  mfsbsd-1.0-beta2
+}}}
+
+patch the Make file or get it from [http://bsd.wifisoft.org/svn/projects/nek/node/mfsBSD/Makefile here]:
+
+{{{
+
+
+--- /usr/mfsbsd-1.0-beta2/Makefile.orig 2009-09-24 18:56:59.000000000 +0200
++++ /usr/nek_svn/node/mfsBSD/Makefile   2009-09-30 20:14:28.000000000 +0200
+@@ -13,7 +13,8 @@
+ IMAGE?=        mfsboot.img
+ ISOIMAGE?= mfsboot.iso
+ TARFILE?= mfsboot.tar.gz
+-KERNCONF?= GENERIC
++#KERNCONF?= GENERIC
++KERNCONF?= KERNEL 
+ 
+ # If you want to build your own kernel and make you own world, you need to set
+ # -DCUSTOM or CUSTOM=1
+@@ -27,6 +28,15 @@
+ # For all of this use
+ # -DCUSTOM -DBUILDWORLD -DBUILDKERNEL or CUSTOM=1 BUILDKERNEL=1 BUILDWORLD=1
+ 
++## more Config options
++# added by Marten Vijn
++# to display over a serial console
++# -DSERIAL or SERIAL=1 
++
++# to generate ssh host keys
++# -DGENSSHKEYS or GENSSHKEYS=1
++# to copy a ./authorized_keys file to the image 
++# -DROOTKEY or ROOTKEY=1
+ #
+ # Paths
+ #
+@@ -59,6 +69,8 @@
+ #
+ CURDIR!=${PWD}
+ WRKDIR?=${CURDIR}/tmp
++SSHKEYGEN=/usr/bin/ssh-keygen -t  
++        
+ #
+ BSDLABEL=bsdlabel
+ #
+@@ -176,8 +188,25 @@
+        @echo "/dev/md0 / ufs rw 0 0" > ${WRKDIR}/mfs/etc/fstab
+        @echo PermitRootLogin yes >> ${WRKDIR}/mfs/etc/ssh/sshd_config
+        @echo 127.0.0.1 localhost > ${WRKDIR}/mfs/etc/hosts
++
++.if defined(SERIAL)
++       @echo  'ttyu0   "/usr/libexec/getty std.9600"   dialup  on secure' \
++                               >> ${WRKDIR}/mfs/etc/ttys
++       @echo -D > ${WRKDIR}/mfs/boot.config
++.endif
++
++.if defined(GENSSHKEYS)
++       @${SSHKEYGEN} rsa1 -b 1024 -f ${WRKDIR}/mfs/etc/ssh/ssh_host_key -N ""
++       @${SSHKEYGEN} dsa -f ${WRKDIR}/mfs/etc/ssh/ssh_host_dsa_key -N ""
++       @${SSHKEYGEN} rsa -f  ${WRKDIR}/mfs/etc/ssh/ssh_host_rsa_key -N ""
++.endif
++
++.if defined(ROOTKEY)
++       @${MKDIR} ${WRKDIR}/mfs/root/.ssh
++       @${CP} authorized_keys ${WRKDIR}/mfs/root/.ssh/authorized_keys
+        @${TOUCH} ${WRKDIR}/.config_done
+        @echo " done"
++.endif
+ 
+ usr.uzip: install prune ${WRKDIR}/.usr.uzip_done
+ ${WRKDIR}/.usr.uzip_done:
+}}}
+
+
+Make sure dhclient is called while booting, where <nic> is the networkcard that will be pxebooting:
+{{{
+echo "ifconfig_<nic>=\"DHCP\"" > conf/rc.conf
+}}}
+
+
+Then create ssh-keys
+{{{
+ssh-keygen
+cp /root/.ssh/id_rsa.pub authorized_keys
+}}} 
+
+If you want my KERNCONF (else change KERNCONF back to GENERIC in the Makefile.
+{{{
+cd /sys/i386/conf
+fetch http://bsd.wifisoft.org/svn/projects/nek/node/mfsBSD/KERNEL
+}}}
+
+Build mfsBSD tar
+{{{
+make tar -DCUSTOM -DSERIAL -DGENSSHKEYS -DROOTKEY KERNCONF=KERNEL -DBUILDWORLD -DBUILDKERNEL
+}}}
+The build world + kernel are optional!
+
+
+Prepare the pxeboot environment
+{{{ 
+mkdir /usr/tftpboot
+cp /boot/pxeboot /usr/tftpboot
+tar xvzf mfsimage.tar.gz -C /usr/tftpboot
+}}}
+
+=== services === 
+
+Enable tftpd  and change path in /etc/inetd.conf
+{{{
+tftp    dgram   udp     wait    root    /usr/libexec/tftpd      tftpd -l -s /usr/tftpboot
+}}}
+
+
+Configure nfs in /etc/exports
+{{{
+/usr/tftpboot -maproot=0 -alldirs -ro
+}}}
+
+
+Configure /usr/local/etc/dhcpd.conf
+{{{
+default-lease-time 600;
+max-lease-time 7200;
+authoritative;
+ddns-update-style none;
+log-facility local7;
+filename "pxeboot";
+option root-path "10.0.0.1:/usr/tftpboot";
+subnet 10.0.0.0 netmask 255.255.255.0 {range 10.0.0.100 10.0.0.200;}
+}}}
+
+Enable inetd,dhcpd and nfs in /etc/rc.conf
+{{{
+nfsserver_enable="YES"
+inetd_enable="YES"
+dhcpd_enable="YES"
+}}}
+
+Start the services(or reboot):
+{{{
+/etc/rc.d/inetd start
+/etc/rc.d/nfsserver start
+/usr/local/etc/rc.d/isc-dhcpd start
+}}}
+
+=== Done ===
+
+From here you can boot a pxeboot enabled host and you can login to it over serial and ssh.
+

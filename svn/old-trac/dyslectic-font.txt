@@ -1,0 +1,93 @@
+== Font for dyslectic people ==
+
+We are creating fonts for dyslectic people. 
+
+Currently we are:
+ - [wiki:bio Marten Vijn]  opensource IT specialist (formerly physical and occupational therapist, dislect) 
+ - [http://www.deleesvlinder.nl/index.php?page=wij-zijn Marjan Klipper], orthopedagoog, dyslexia specialist
+ - [http://www.deleesvlinder.nl/index.php?page=wij-zijn Nanda Klop], logopedist, dyslexia specialist
+ - 
+
+It is our strong belief these should be [http://en.wikipedia.org/wiki/Free_software free] fonts. 
+
+Al fonts are based on [http://martenvijn.nl/svn/fonts/trunk/FreeMono.ttf  FreeMono] and [http://martenvijn.nl/svn/fonts/trunk/FreeSans.otf FreeSans], a copyleft fonttype. 
+
+The modifications are available under a [http://en.wikipedia.org/wiki/BSD_licenses BSD-style license] or [http://en.wikipedia.org/wiki/Copyleft copyleft]. 
+
+=== Testing/using ===
+If you want to test this font, it is available on this url:
+
+Current release is 0.04 (Dec 12th 2011) (check previous ones [http://martenvijn.nl/svn/fonts/tag/ here].) 
+
+ * [http://martenvijn.nl/svn/fonts/tag/0.04/Kobus.ttf Kobus] is called Kobus because it is for Marten's son.
+ * [http://martenvijn.nl/svn/fonts/tag/0.04/Kobus_sans.ttf Kobus_Sans]  is called Kobus because it is for Marten's son.
+ * [http://martenvijn.nl/svn/fonts/tag/0.04/LeesVlinder.ttf LeesVlinder] is created by Marjan and Nanda
+
+Samples:
+ * [http://martenvijn.nl/svn/fonts/tag/0.04/demo.odt Demo Libre Office]
+ * [http://martenvijn.nl/svn/fonts/tag/0.04/demo.pdf Demo PDF ]
+
+==== Installation on Linux ==== (mail me windows/mac howto's)
+ 
+ * Just download the file and open it with fontviewer and click on '''install'''.
+
+ * On the commandline [http://youtu.be/KfnfROAOfEc youtube]
+{{{
+mkdir -p ~/.fonts
+cd ~/.fonts
+wget http://martenvijn.nl/svn/fonts/tag/<version>/<type>.ttf #replace version/type for above url's
+}}}
+
+
+==== Instalation Windows/Mac ====
+
+Since I don't have any Windows / Mac test machines, please create one and mail me your howto's  or/and URL's.   
+
+
+=== progress ===
+
+I'll  be making a lot more changes to the coming weeks, so may check also the svn/trunk for the latest results.
+
+ 
+
+ 
+
+== Helping us ==
+ - Mac installer + howto's
+ - Windows installer + howto's
+ - funding !!
+
+ * Contact me via font@martenvijn.nl  
+
+
+== Development ==
+
+
+See README.txt and License.txt in 
+
+http://martenvijn.nl/svn/fonts
+
+=== development files ===
+
+A lot raw material is here:
+
+ * http://martenvijn.nl/svn/fonts/trunk
+ * optionally check those out with subversion 
+{{{
+svn co http://martenvijn.nl/svn/fonts/trunk
+}}}
+=== How to edit fonts ===
+
+I started with fontforge to edit the free fonttype FreeMono. 
+
+ * In Ubuntu do
+{{{
+sudo apt-get install fontforge
+wget  http://martenvijn.nl/svn/fonts/tag/0.01/Kobus.ttf (#or later version)
+or do somelthing like  
+svn co http://martenvijn.nl/svn/fonts/ )
+fontforge  Kobus.sdf
+}}}
+
+ * For windows try: http://fontforge.sourceforge.net/ms-install.html
+ * For Mac try: http://fontforge.sourceforge.net/mac-install.html

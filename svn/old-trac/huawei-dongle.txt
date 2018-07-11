@@ -1,0 +1,151 @@
+== Mobile Broadband Internet access ==
+
+using:
+ -  u3g module 
+ - on huawei E620 
+ - with Vodafone (nl) 
+ - on FreeBSD CURRENT 8.0
+
+
+=== step 1 ===
+
+rebuild system to current following the [http://www.freebsd.org/doc/en/books/handbook/current-stable.html handbook] 
+
+
+=== step 2 ===
+
+
+backup ppp.conf
+
+{{{
+cd /etc/ppp
+mv ppp.conf ppp.conf.orig
+}}}
+
+
+copy and paste this into /etc/ppp/ppp.conf
+{{{
+default:
+ set device /dev/cuaU0.0
+ set speed 460800
+ set timeout 0
+ set authname vodafone
+ set authkey vodafone
+ set dial "ABORT BUSY TIMEOUT 2 \
+        \"\" \
+        AT OK-AT-OK \
+        AT+CFUN=1 OK-AT-OK \
+        AT+CMEE=2 OK-AT-OK \
+        AT+CPIN? +CPIN:\\\sREADY-AT+CPIN=0000-OK \
+        AT+CGMI OK \
+        AT+CGMM OK \
+        AT+CGMR OK \
+        AT+CGSN OK \
+        AT+CSQ OK \
+        AT+CGDCONT=1,\\\"IP\\\",\\\"office.vodafone.nl\\\" OK \
+        AT+CREG? OK \
+        AT+CGREG? OK-AT-OK \
+        AT+CGATT? OK \
+        AT+CGCLASS? OK \
+        AT+COPS? OK \
+        AT+CIMI OK-AT-OK \
+        ATDT*99***1# CONNECT"
+
+ # Lower the MTU as this seems to make the link more stable.
+ set mtu maximum 750
+ #set crtscts on
+ #set ipcpretries 3 10 5
+ #disable vjcomp
+ #disable acfcomp
+ #disable deflate
+ #disable deflate24
+ #disable pred1
+ #disable protocomp
+ #disable mppe
+ #disable ipv6cp
+ #disable lqr
+ enable dns
+ nat enable yes
+ set ifaddr 0/0 10.64.64.64 255.255.255.0 0.0.0.0 
+ add default HISADDR                   # Add a (sticky) default route
+
+}}}
+
+
+if necessary  change pin
+
+(0000 is default)
+
+{{{ 
+ AT+CPIN? +CPIN:\\\sREADY-AT+CPIN=0000-OK
+}}}
+
+business or personal account
+
+change
+{{{
+office.vodafone.nl 
+to 
+web.vodafone.nl 
+}}}
+
+=== step3 test ===
+
+start ppp
+
+{{{
+# ppp
+Loading /lib/libalias_cuseeme.so
+Loading /lib/libalias_ftp.so
+Loading /lib/libalias_irc.so
+Loading /lib/libalias_nbt.so
+Loading /lib/libalias_pptp.so
+Loading /lib/libalias_skinny.so
+Loading /lib/libalias_smedia.so
+Working in interactive mode
+Using interface: tun0
+}}}
+to start the connection
+{{{
+ppp ON hostname> dial default
+}}}
+
+now the blinking green led gets:
+ - blinking blue (waiting for ppp)
+ - steady blue (having connection)
+ - lighting up steady blue (traffic)
+
+
+
+to quit ppp
+
+{{{
+> quit
+}}}
+
+=== additional ===
+
+to start at boottime
+add these line to /etc/rc.conf
+
+{{{
+ppp_enable="YES"
+ppp_profile="default"
+
+}}}
+
+
+=== Thanks to ===
+ * [http://people.freebsd.org/~n_hibma/ Nick Hibma], 
+ * Robert Blacquiere 
+ * people on IRCnet #FreeBSD.nl and dbug.nl mailing list, 
+
+
+
+
+
+
+
+
+
+  
