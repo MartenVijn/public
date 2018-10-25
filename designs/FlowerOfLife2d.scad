@@ -10,7 +10,7 @@ rot1=6;
 rot2=6;
 rot3=12;
 
-all(dim,rand,rot1,rot2);
+rotate([0,0,30]) all(dim,rand,rot1,rot2);
 
 //bow(dim,rand);
 
