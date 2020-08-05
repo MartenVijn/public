@@ -3,7 +3,7 @@
 # npm install markdown-pdf -g
 # npm install markdown -g
 
-for file in cv_2019
+for file in cv_2020
 do	
 #	md2html -f $file.md 
 	md2html $file.md > ${file}.html
